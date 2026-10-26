@@ -1,6 +1,14 @@
 {
     "files.eol": "\n",
-    "editor.formatOnSave": true,
+    "editor.formatOnSave": false,
     "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
     "clangd.path": "/usr/bin/clangd-20"
+    // Увеличение шрифта внутри встроенного терминала
+    "terminal.integrated.fontSize": 16,
+	// Увеличение шрифта интерфейса (боковой панели Explorer, меню и вкладок)
+  	"window.zoomLevel": 1.2
+     // Уменьшаем шрифт кода в основном окне, чтобы скомпенсировать window.zoomLevel
+	"editor.fontSize": 17,
+    // Размер шрифта для подсказок и всплывающих окон (тоже можно скомпенсировать)
+  	"editor.suggestFontSize": 17
 }
