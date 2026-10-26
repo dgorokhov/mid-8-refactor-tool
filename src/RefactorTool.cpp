@@ -24,7 +24,20 @@ void RefactorHandler::run(const MatchFinder::MatchResult &Result) {
     auto& SM = *Result.SourceManager; // Получаем SourceManager для проверки isInMainFile
     
     if (const auto *Dtor = Result.Nodes.getNodeAs<CXXDestructorDecl>("classDecl")) {
-        handle_nv_dtor(Dtor, Diag, SM);
+            // есть ли у класса есть наследники в TU
+            const CXXRecordDecl *Record = Dtor->getParent();
+            bool hasDerived = false;
+            for (const auto *D : Result.Context->getTranslationUnitDecl()->decls()) {
+                if (const auto *RD = dyn_cast<CXXRecordDecl>(D)) {
+                    if (RD->hasDefinition() && RD != Record && RD->isDerivedFrom(Record)) {
+                        hasDerived = true;
+                        break;
+                    }
+                }
+            }
+            if (hasDerived) {
+                handle_nv_dtor(Dtor, Diag, SM);
+            }
     }
 
     if (const auto *Method = Result.Nodes.getNodeAs<CXXMethodDecl>("methodDecl");
