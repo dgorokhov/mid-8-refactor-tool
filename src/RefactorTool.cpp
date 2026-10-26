@@ -42,11 +42,15 @@ void RefactorHandler::run(const MatchFinder::MatchResult &Result) {
 
     if (const auto *Method = Result.Nodes.getNodeAs<CXXMethodDecl>("methodDecl");
         Method && Method->size_overridden_methods() > 0 && !Method->hasAttr<OverrideAttr>()) {
-        handle_miss_override(Method, Diag, SM);
+        if (SM.isInMainFile(Method->getLocation())) {
+            handle_miss_override(Method, Diag, SM);
+        }
     }
 
     if (const auto *LoopVar = Result.Nodes.getNodeAs<VarDecl>("VarDecl")) {
-        handle_crange_for(LoopVar, Diag, SM);
+        if (SM.isInMainFile(LoopVar->getLocation())) {
+            handle_crange_for(LoopVar, Diag, SM);
+        }
     }
 }
 
