@@ -103,13 +103,24 @@ void RefactorHandler::handle_miss_override(const CXXMethodDecl *Method,
 void RefactorHandler::handle_crange_for(const VarDecl *LoopVar,
                                         DiagnosticsEngine &Diag,
                                         SourceManager &SM){
-    // Реализуйте Ваш код ниже
+    SourceLocation Loc = LoopVar->getLocation();
+
     const unsigned DiagID = Diag.getCustomDiagID(
-            DiagnosticsEngine::Remark,
-            "Объявлена переменная"
+            DiagnosticsEngine::Warning,
+            "range-for copies const object, adding '&'"
         );
-    Diag.Report(LoopVar->getLocation(), DiagID);
+    Diag.Report(Loc, DiagID);
+    TypeSourceInfo *TSI = LoopVar->getTypeSourceInfo();
+    if (!TSI) return;
+    SourceLocation TypeEndLoc = TSI->getTypeLoc().getEndLoc();
+    SourceLocation InsertLoc = Lexer::getLocForEndOfToken(TypeEndLoc, 0, SM, LoopVar->getASTContext().getLangOpts());
+
+    if (InsertLoc.isValid()) {
+        Rewrite.InsertTextBefore(InsertLoc, "&");
+    }
 }
+
+
 
 //todo: ниже необходимо реализовать матчеры для поиска узлов AST
 //note: синтаксис написания матчеров точно такой же как и для использования clang-query
@@ -122,14 +133,20 @@ void RefactorHandler::handle_crange_for(const VarDecl *LoopVar,
 */
 auto NvDtorMatcher()
 {
-    //todo: замените код ниже, на свою реализацию, необходимо реализовать матчеры для поиска невиртуальных деструкторов
-    return cxxDestructorDecl().bind("classDecl");
+    return cxxDestructorDecl(
+        unless(isVirtual()),
+        ofClass(cxxRecordDecl(hasDefinition()))
+    ).bind("classDecl");
 }
 
+// Матчер для поиска переопределенных методов без override (Случай 2)
 auto NoOverrideMatcher()
 {
-    //todo: замените код ниже, на свою реализацию, необходимо реализовать матчеры для поиска методов без override
-    return cxxMethodDecl().bind("methodDecl");
+    return cxxMethodDecl(
+        isOverride(),
+        unless(cxxDestructorDecl()), // Исключаем деструкторы
+        unless(isImplicit())         // Исключаем методы, сгенерированные компилятором
+    ).bind("methodDecl");
 }
 
 auto NoRefConstVarInRangeLoopMatcher()
