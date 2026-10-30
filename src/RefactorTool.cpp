@@ -55,27 +55,48 @@ void RefactorHandler::run(const MatchFinder::MatchResult &Result) {
 }
 
 //todo: необходимо реализовать обработку случая невиртуального деструктора
+// Реализация случая 1: Добавление virtual к деструктору базового класса
 void RefactorHandler::handle_nv_dtor(const CXXDestructorDecl *Dtor,
                             DiagnosticsEngine &Diag,
                             SourceManager &SM) {
-    //Реализуйте Ваш код ниже
+    SourceLocation Loc = Dtor->getLocation(); // Указывает на начало деструктора (~Имя)
+    
+    // check if virtual alread added
+    unsigned LocRaw = Loc.getRawEncoding();
+    if (virtualDtorLocations.count(LocRaw)) return;
+    virtualDtorLocations.insert(LocRaw);
+
     const unsigned DiagID = Diag.getCustomDiagID(
-            DiagnosticsEngine::Remark,
-            "Объявлен деструктор"
+            DiagnosticsEngine::Warning,
+            "Base class has childrenn, its dtor is non-virtual, adding 'virtual' "
         );
-    Diag.Report(Dtor->getLocation(), DiagID);
+    Diag.Report(Loc, DiagID);
+    Rewrite.InsertTextBefore(Loc, "virtual ");
 }
+
 
 //todo: необходимо реализовать обработку случая отсутствие override
 void RefactorHandler::handle_miss_override(const CXXMethodDecl *Method,
                             DiagnosticsEngine &Diag,
                             SourceManager &SM) {
-    //Реализуйте Ваш код ниже
+    SourceLocation Loc = Method->getLocation();
+
     const unsigned DiagID = Diag.getCustomDiagID(
-            DiagnosticsEngine::Remark,
-            "Объявлен метод"
+            DiagnosticsEngine::Warning,
+            "Method w/o override, addigg 'override'"
         );
-    Diag.Report(Method->getLocation(), DiagID);
+    Diag.Report(Loc, DiagID);
+
+    // find )
+    SourceLocation ParamEnd = Method->getParametersSourceRange().getEnd();
+    SourceLocation RParenLoc = Lexer::findLocationAfterToken(ParamEnd, tok::r_paren, SM, Method->getASTContext().getLangOpts(), false);
+
+    if (RParenLoc.isValid()) {
+        Rewrite.InsertTextBefore(RParenLoc, " override");
+    } else {
+        SourceLocation InsertLoc = Method->hasBody() ? Method->getBody()->getBeginLoc() : Method->getEndLoc();
+        Rewrite.InsertTextBefore(InsertLoc, " override ");
+    }
 }
 
 //todo: необходимо реализовать обработку случая отсутствие & в range-for
