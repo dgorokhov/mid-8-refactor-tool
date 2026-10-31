@@ -19,13 +19,26 @@ static llvm::cl::OptionCategory ToolCategory("refactor-tool options");
 
 // Метод run вызывается для каждого совпадения с матчем. 
 // Мы проверяем тип совпадения по bind-именам и применяем рефакторинг.
+
+auto NvDtorMatcher()
+{
+    return cxxDestructorDecl(
+        unless(isVirtual()),
+        unless(isImplicit()), // КРИТИЧЕСКИ ВАЖНО: Игнорируем деструкторы, созданные компилятором автоматичеси
+        ofClass(cxxRecordDecl(hasDefinition()).bind("baseClass"))
+    ).bind("classDecl");
+}
+
+// 2. Обновляем логику проверки в методе run() внутри src/RefactorTool.cpp
 void RefactorHandler::run(const MatchFinder::MatchResult &Result) {
     auto& Diag = Result.Context->getDiagnostics();
-    auto& SM = *Result.SourceManager; // Получаем SourceManager для проверки isInMainFile
+    auto& SM = *Result.SourceManager;
     
     if (const auto *Dtor = Result.Nodes.getNodeAs<CXXDestructorDecl>("classDecl")) {
-            // есть ли у класса есть наследники в TU
-            const CXXRecordDecl *Record = Dtor->getParent();
+        if (SM.isInMainFile(Dtor->getLocation())) {
+            const CXXRecordDecl *Record = Result.Nodes.getNodeAs<CXXRecordDecl>("baseClass");
+            
+            // Проверяем по всему AST, является ли этот класс базовым для кого-то другого
             bool hasDerived = false;
             for (const auto *D : Result.Context->getTranslationUnitDecl()->decls()) {
                 if (const auto *RD = dyn_cast<CXXRecordDecl>(D)) {
@@ -35,11 +48,14 @@ void RefactorHandler::run(const MatchFinder::MatchResult &Result) {
                     }
                 }
             }
+            // Вызываем рефакторинг только если у класса ЕСТЬ наследники
             if (hasDerived) {
                 handle_nv_dtor(Dtor, Diag, SM);
             }
+        }
     }
 
+    // Оставшаяся часть run() для методов и range-for остается без изменений...
     if (const auto *Method = Result.Nodes.getNodeAs<CXXMethodDecl>("methodDecl");
         Method && Method->size_overridden_methods() > 0 && !Method->hasAttr<OverrideAttr>()) {
         if (SM.isInMainFile(Method->getLocation())) {
@@ -131,13 +147,6 @@ void RefactorHandler::handle_crange_for(const VarDecl *LoopVar,
         return cxxRecordDecl().bind("classDecl");
     }
 */
-auto NvDtorMatcher()
-{
-    return cxxDestructorDecl(
-        unless(isVirtual()),
-        ofClass(cxxRecordDecl(hasDefinition()))
-    ).bind("classDecl");
-}
 
 // Матчер для поиска переопределенных методов без override (Случай 2)
 auto NoOverrideMatcher()
