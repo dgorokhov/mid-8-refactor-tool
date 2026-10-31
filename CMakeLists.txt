@@ -100,6 +100,21 @@ endif()
 # Set the build directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}")
 
+
+#===============================================================================
+# 3.5. LOAD GOOGLETEST GLOBALLY (Добавь этот блок сюда)
+#===============================================================================
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/refs/tags/release-1.12.1.tar.gz
+)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+set(INSTALL_GTEST OFF)
+set(BUILD_SHARED_LIBS OFF)
+FetchContent_MakeAvailable(googletest)
+
+
 #===============================================================================
 # 4. ADD SUB-TARGETS
 # Doing this at the end so that all definitions and link/include paths are

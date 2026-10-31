@@ -1,0 +1,8 @@
+configure DEBUG,cmake -B build -DCMAKE_BUILD_TYPE=Debug
+configure RELEASE,cmake -B build -DCMAKE_BUILD_TYPE=Release
+build all,cmake --build build -j$(nproc)
+clean cache,rm -rf build/* && echo "CMake cache cleaned!"
+build CLEAN DEBUG,rm -rf build;cmake -B build;cmake --build build
+run Archie,./build/Archie
+build target,read -p "Target: " choice; cmake --build build --target $choice
+build sanitizer,cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZER=ON && cmake --build build -j$(nproc)
