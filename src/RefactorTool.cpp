@@ -149,10 +149,16 @@ auto NoOverrideMatcher()
     ).bind("methodDecl");
 }
 
+// Матчер для поиска range-for без ссылки (Случай 3)
 auto NoRefConstVarInRangeLoopMatcher()
 {
-    //todo: замените код ниже, на свою реализацию, необходимо реализовать матчеры для поиска range-for без &
-    return varDecl().bind("VarDecl");
+    // Ищем переменную внутри cxxForRangeStmt, которая const, но не является ссылкой или фундаментальным типом
+    return varDecl(
+        hasType(isConstQualified()),
+        unless(hasType(referenceType())),
+        unless(hasType(builtinType())), // Исключаем int, char, double и т.д.
+        hasAncestor(cxxForRangeStmt())
+    ).bind("VarDecl");
 }
 
 // Конструктор принимает Rewriter для изменения кода.
@@ -167,7 +173,6 @@ ComplexConsumer::ComplexConsumer(Rewriter &Rewrite) : Handler(Rewrite) {
 void ComplexConsumer::HandleTranslationUnit(ASTContext &Context) {
     Finder.matchAST(Context);
 }
-
 
 std::unique_ptr<ASTConsumer> CodeRefactorAction::CreateASTConsumer(CompilerInstance &CI,
                                                 StringRef file) {
@@ -184,13 +189,13 @@ RewriterForCodeRefactor.setSourceMgr(CI.getSourceManager(),
 }
 
 void CodeRefactorAction::EndSourceFileAction() {
-    // Применяем изменения в файле.
+    // Применяем изменения в файле и сохраняем на диск
     if (RewriterForCodeRefactor.overwriteChangedFiles()) {
         llvm::errs() << "Error applying changes to files.\n";
     }
 }
 
-
+#ifndef WITHOUT_MAIN
 int main(int argc, const char **argv) {
     // Парсер опций: Обрабатывает флаги командной строки, компиляционные базы данных.
     auto ExpectedParser = CommonOptionsParser::create(argc, argv, ToolCategory);
@@ -204,3 +209,4 @@ int main(int argc, const char **argv) {
     // Запускаем RefactorAction.
     return Tool.run(newFrontendActionFactory<CodeRefactorAction>().get());
 }
+#endif

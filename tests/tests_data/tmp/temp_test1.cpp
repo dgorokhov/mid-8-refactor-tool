@@ -3,17 +3,17 @@
 class BaseNoDtor {
 public:
     int x;
-    ~BaseNoDtor() = default;
+    virtual ~BaseNoDtor() = default;
 };
 
 class DerivedFromNoDtor : public BaseNoDtor {};
 
 class BaseNonVirtual {  // Невиртуальный деструктор
 public:
-    ~BaseNonVirtual() {}  //Убедимся что один раз virtual
+    virtual ~BaseNonVirtual() {}  //Убедимся что один раз virtual
 };
 
-class DerivedFromNonVirtual : public BaseNonVirtual {};
+class virtual DerivedFromNonVirtual : public BaseNonVirtual {};
 
 class DerivedFromNonVirtual1 : public DerivedFromNonVirtual {};
 

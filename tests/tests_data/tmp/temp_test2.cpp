@@ -9,18 +9,18 @@ public:
 
 class Derived : public Base {
 public:
-    void func() {}  // Переопределен без override
-    void func(int a) {}  // Переопределен без override
+    void func()  override {}  // Переопределен без override
+    void func(int a) override {}  // Переопределен без override
     ~Derived() {}  // Деструктор без override
 };
 
 class SubDerived : public Derived {
 public:
-    void func() {}  // Переопределен без override
-    void func(int a) {}  // Переопределен без override
+    void func()  override {}  // Переопределен без override
+    void func(int a) override {}  // Переопределен без override
 };
 
-class BaseWithOverride {
+class virtual BaseWithOverride {
 public:
     virtual void func() {}
 };
