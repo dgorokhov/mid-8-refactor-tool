@@ -1,11 +1,11 @@
-#include <gtest/gtest.h>
 #include "../include/RefactorTool.h"
-#include "clang/Tooling/Tooling.h"
-#include "clang/Rewrite/Core/Rewriter.h"
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/Rewrite/Core/Rewriter.h"
+#include "clang/Tooling/Tooling.h"
+#include <gtest/gtest.h>
 #include <memory>
 #include <string>
-
+ 
 // Хелпер для запуска разработанного рефакторинга над строкой кода в памяти
 std::string runRefactorOnCode(const std::string &Code) {
     struct TestAction : public clang::ASTFrontendAction {
@@ -27,7 +27,7 @@ std::string runRefactorOnCode(const std::string &Code) {
     auto Action = std::make_unique<TestAction>(Output);
     // Запускаем инструмент. Имя файла обязательно должно иметь расширение .cpp
     clang::tooling::runToolOnCode(std::move(Action), Code, "input_test_file.cpp");
-    return Output.empty() ? Code : Output; 
+    return Output.empty() ? Code : Output;
 }
 
 // === ТЕСТЫ СЛУЧАЯ 1: НЕВИРТУАЛЬНЫЕ ДЕСТРУКТОРЫ ===
@@ -55,7 +55,7 @@ TEST(RefactorTest, AddsOverrideToDerivedMethod) {
 
     std::string Output = runRefactorOnCode(Input);
     bool hasOverride = (Output.find("override") != std::string::npos);
-    
+
     EXPECT_TRUE(hasOverride);
 }
 
