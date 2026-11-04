@@ -17,39 +17,51 @@ using namespace clang::tooling;
 
 static llvm::cl::OptionCategory ToolCategory("refactor-tool options");
 
-// Метод run вызывается для каждого совпадения с матчем.
+// хранение базовых классов, с наследниками
+static std::unordered_set<const clang::CXXRecordDecl*> ClassesWithDerived;
 
-auto NvDtorMatcher() {
-    return cxxDestructorDecl(
-               unless(isVirtual()),
-               unless(isImplicit()),  // КРИТИЧЕСКИ ВАЖНО: Игнорируем деструкторы, созданные компилятором автоматичеси
-               ofClass(cxxRecordDecl(hasDefinition()).bind("baseClass")))
-        .bind("classDecl");
-}
+// Оптимиз-ный HandleTranslationUnit
+void ComplexConsumer::HandleTranslationUnit(ASTContext &Context) {
+    // Очищаем множество перед обработкой нового файла
+    ClassesWithDerived.clear();
 
-void RefactorHandler::run(const MatchFinder::MatchResult &Result) {
-    auto &Diag = Result.Context->getDiagnostics();
-    auto &SM = *Result.SourceManager;
-
-    if (const auto *Dtor = Result.Nodes.getNodeAs<CXXDestructorDecl>("classDecl")) {
-        if (SM.isInMainFile(Dtor->getLocation())) {
-            const CXXRecordDecl *Record = Result.Nodes.getNodeAs<CXXRecordDecl>("baseClass");
-            // Проверяем по AST, явл-я ли класс базовым для кого-то tot
-            bool hasDerived = false;
-            for (const auto *D : Result.Context->getTranslationUnitDecl()->decls()) {
-                if (const auto *RD = dyn_cast<CXXRecordDecl>(D)) {
-                    if (RD->hasDefinition() && RD != Record && RD->isDerivedFrom(Record)) {
-                        hasDerived = true;
-                        break;
+    // Однократный тяжелый проход по всему Translation Unit для поиска связей наследников
+    for (const auto *D : Context.getTranslationUnitDecl()->decls()) {
+        if (const auto *RD = dyn_cast<CXXRecordDecl>(D)) {
+            // Если класс определен и у него есть базовые классы
+            if (RD->hasDefinition() && RD->getNumBases() > 0) {
+                // Идем по его базовым классам и запоминаем их
+                for (const auto &Base : RD->bases()) {
+                    if (const auto *BaseRecord = Base.getType()->getAsCXXRecordDecl()) {
+                        if (BaseRecord->hasDefinition()) {
+                            // Сохраняем указатель на базовый класс
+                            ClassesWithDerived.insert(BaseRecord->getCanonicalDecl());
+                        }
                     }
                 }
             }
-            // рефакторинг только если  ЕСТЬ наследники
-            if (hasDerived) {
+        }
+    }
+
+    Finder.matchAST(Context);
+}
+
+void RefactorHandler::run(const MatchFinder::MatchResult &Result) {
+    auto& Diag = Result.Context->getDiagnostics();
+    auto& SM = *Result.SourceManager;
+    
+    if (const auto *Dtor = Result.Nodes.getNodeAs<CXXDestructorDecl>("classDecl")) {
+        if (SM.isInMainFile(Dtor->getLocation())) {
+            const CXXRecordDecl *Record = Result.Nodes.getNodeAs<CXXRecordDecl>("baseClass");
+            
+            // Вместо тяжелого цикла — мгновенный поиск O(1) в хэш-таблице!
+            if (Record && ClassesWithDerived.count(Record->getCanonicalDecl())) {
                 handle_nv_dtor(Dtor, Diag, SM);
             }
         }
     }
+
+    // Код для методов (override) и range-for остается без изменений
     if (const auto *Method = Result.Nodes.getNodeAs<CXXMethodDecl>("methodDecl");
         Method && Method->size_overridden_methods() > 0 && !Method->hasAttr<OverrideAttr>()) {
         if (SM.isInMainFile(Method->getLocation())) {
@@ -62,6 +74,16 @@ void RefactorHandler::run(const MatchFinder::MatchResult &Result) {
             handle_crange_for(LoopVar, Diag, SM);
         }
     }
+}
+
+// Метод run вызывается для каждого совпадения с матчем.
+
+auto NvDtorMatcher() {
+    return cxxDestructorDecl(
+               unless(isVirtual()),
+               unless(isImplicit()),  // КРИТИЧЕСКИ ВАЖНО: Игнорируем деструкторы, созданные компилятором автоматичеси
+               ofClass(cxxRecordDecl(hasDefinition()).bind("baseClass")))
+        .bind("classDecl");
 }
 
 // todo: необходимо реализовать обработку случая невиртуального деструктора
@@ -153,9 +175,6 @@ ComplexConsumer::ComplexConsumer(Rewriter &Rewrite) : Handler(Rewrite) {
     Finder.addMatcher(NoOverrideMatcher(), &Handler);
     Finder.addMatcher(NoRefConstVarInRangeLoopMatcher(), &Handler);
 }
-
-// Метод HandleTranslationUnit вызывается для каждого файла.
-void ComplexConsumer::HandleTranslationUnit(ASTContext &Context) { Finder.matchAST(Context); }
 
 std::unique_ptr<ASTConsumer> CodeRefactorAction::CreateASTConsumer(CompilerInstance &CI, StringRef file) {
     RewriterForCodeRefactor.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
