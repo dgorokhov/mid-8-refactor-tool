@@ -18,7 +18,7 @@ using namespace clang::tooling;
 static llvm::cl::OptionCategory ToolCategory("refactor-tool options");
 
 // хранение базовых классов, с наследниками
-static std::unordered_set<const clang::CXXRecordDecl*> ClassesWithDerived;
+static std::unordered_set<const clang::CXXRecordDecl *> ClassesWithDerived;
 
 // Оптимиз-ный HandleTranslationUnit
 void ComplexConsumer::HandleTranslationUnit(ASTContext &Context) {
@@ -47,13 +47,13 @@ void ComplexConsumer::HandleTranslationUnit(ASTContext &Context) {
 }
 
 void RefactorHandler::run(const MatchFinder::MatchResult &Result) {
-    auto& Diag = Result.Context->getDiagnostics();
-    auto& SM = *Result.SourceManager;
-    
+    auto &Diag = Result.Context->getDiagnostics();
+    auto &SM = *Result.SourceManager;
+
     if (const auto *Dtor = Result.Nodes.getNodeAs<CXXDestructorDecl>("classDecl")) {
         if (SM.isInMainFile(Dtor->getLocation())) {
             const CXXRecordDecl *Record = Result.Nodes.getNodeAs<CXXRecordDecl>("baseClass");
-            
+
             // Вместо тяжелого цикла — мгновенный поиск O(1) в хэш-таблице!
             if (Record && ClassesWithDerived.count(Record->getCanonicalDecl())) {
                 handle_nv_dtor(Dtor, Diag, SM);
@@ -76,8 +76,7 @@ void RefactorHandler::run(const MatchFinder::MatchResult &Result) {
     }
 }
 
-// Метод run вызывается для каждого совпадения с матчем.
-
+// Метод run вызывается для каждого совпадения с матчем.п
 auto NvDtorMatcher() {
     return cxxDestructorDecl(
                unless(isVirtual()),
@@ -126,16 +125,16 @@ void RefactorHandler::handle_miss_override(const CXXMethodDecl *Method, Diagnost
 void RefactorHandler::handle_crange_for(const VarDecl *LoopVar, DiagnosticsEngine &Diag, SourceManager &SM) {
     SourceLocation Loc = LoopVar->getLocation();
 
-    const unsigned DiagID =
-        Diag.getCustomDiagID(DiagnosticsEngine::Warning, "range-for copies const object, adding '&'");
-    Diag.Report(Loc, DiagID);
     TypeSourceInfo *TSI = LoopVar->getTypeSourceInfo();
     if (!TSI)
         return;
+
     SourceLocation TypeEndLoc = TSI->getTypeLoc().getEndLoc();
     SourceLocation InsertLoc = Lexer::getLocForEndOfToken(TypeEndLoc, 0, SM, LoopVar->getASTContext().getLangOpts());
-
     if (InsertLoc.isValid()) {
+        const unsigned DiagID =
+            Diag.getCustomDiagID(DiagnosticsEngine::Warning, "range-for copies const object, adding '&'");
+        Diag.Report(Loc, DiagID);
         Rewrite.InsertTextBefore(InsertLoc, "&");
     }
 }
