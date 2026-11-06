@@ -53,8 +53,6 @@ void RefactorHandler::run(const MatchFinder::MatchResult &Result) {
     if (const auto *Dtor = Result.Nodes.getNodeAs<CXXDestructorDecl>("classDecl")) {
         if (SM.isInMainFile(Dtor->getLocation())) {
             const CXXRecordDecl *Record = Result.Nodes.getNodeAs<CXXRecordDecl>("baseClass");
-
-            // Вместо тяжелого цикла — мгновенный поиск O(1) в хэш-таблице!
             if (Record && ClassesWithDerived.count(Record->getCanonicalDecl())) {
                 handle_nv_dtor(Dtor, Diag, SM);
             }
@@ -78,10 +76,8 @@ void RefactorHandler::run(const MatchFinder::MatchResult &Result) {
 
 // Метод run вызывается для каждого совпадения с матчем.п
 auto NvDtorMatcher() {
-    return cxxDestructorDecl(
-               unless(isVirtual()),
-               unless(isImplicit()),  // КРИТИЧЕСКИ ВАЖНО: Игнорируем деструкторы, созданные компилятором автоматичеси
-               ofClass(cxxRecordDecl(hasDefinition()).bind("baseClass")))
+    return cxxDestructorDecl(unless(isVirtual()), unless(isImplicit()),
+                             ofClass(cxxRecordDecl(hasDefinition()).bind("baseClass")))
         .bind("classDecl");
 }
 
@@ -125,10 +121,14 @@ void RefactorHandler::handle_miss_override(const CXXMethodDecl *Method, Diagnost
 void RefactorHandler::handle_crange_for(const VarDecl *LoopVar, DiagnosticsEngine &Diag, SourceManager &SM) {
     SourceLocation Loc = LoopVar->getLocation();
 
+    // ПРОВЕРЯЕМ НА ФУНДАМЕНТАЛЬНОСТЬ
+    clang::QualType VarType = LoopVar->getType();
+    if (!VarType.isNull() && VarType.getCanonicalType()->isFundamentalType()) {
+        return;
+    }
     TypeSourceInfo *TSI = LoopVar->getTypeSourceInfo();
     if (!TSI)
         return;
-
     SourceLocation TypeEndLoc = TSI->getTypeLoc().getEndLoc();
     SourceLocation InsertLoc = Lexer::getLocForEndOfToken(TypeEndLoc, 0, SM, LoopVar->getASTContext().getLangOpts());
     if (InsertLoc.isValid()) {
@@ -159,10 +159,18 @@ auto NoOverrideMatcher() {
 }
 
 // Матчер для поиска range-for без ссылки (Случай 3)
+// auto NoRefConstVarInRangeLoopMatcher() {
+//     // Ищем переменную внутри cxxForRangeStmt, которая const, но не является ссылкой или фундаментальным типом
+//     return varDecl(hasType(isConstQualified()), unless(hasType(referenceType())),
+//                    unless(hasType(builtinType())),  // Исключаем int, char, double и т.д.
+//                    hasAncestor(cxxForRangeStmt()))
+//         .bind("VarDecl");
+// }
+
 auto NoRefConstVarInRangeLoopMatcher() {
-    // Ищем переменную внутри cxxForRangeStmt, которая const, но не является ссылкой или фундаментальным типом
     return varDecl(hasType(isConstQualified()), unless(hasType(referenceType())),
-                   unless(hasType(builtinType())),  // Исключаем int, char, double и т.д.
+                   // сквозь "auto" проверяем, что тип нне фундаментальный
+                   unless(hasType(qualType(hasUnqualifiedDesugaredType(builtinType())))),
                    hasAncestor(cxxForRangeStmt()))
         .bind("VarDecl");
 }

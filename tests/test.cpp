@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 #include <memory>
 #include <string>
- 
+
 // Хелпер для запуска разработанного рефакторинга над строкой кода в памяти
 std::string runRefactorOnCode(const std::string &Code) {
     struct TestAction : public clang::ASTFrontendAction {
@@ -80,4 +80,10 @@ TEST(RefactorTest, NoReferenceForBuiltinTypes) {
     std::string Input = "namespace std { template<typename T> struct vector { T* begin(); T* end(); }; }\n"
                         "void f(std::vector<int>& v) { for (const int x : v) {} }";
     EXPECT_EQ(runRefactorOnCode(Input), Input);
+}
+
+TEST(RefactorTest, NoReferenceForBuiltinTypesWithAuto) {
+    std::string Input = "namespace std { template<typename T> struct vector { T* begin(); T* end(); }; }\n"
+                        "void f(std::vector<int>& v) { for (const auto x : v) {} }";  // Проверка случая с auto
+    EXPECT_EQ(runRefactorOnCode(Input), Input);  // Ожидаем, что код останется БЕЗ изменений
 }
