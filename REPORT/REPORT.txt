@@ -1,0 +1,137 @@
+dev@042fc2a8edf9:/workspaces/mid-8-refactor-tool$ ./menu.sh 
+...Menu............
+[0] configure DEBUG
+[1] configure RELEASE
+[2] build all
+[3] clean cache
+[4] build CLEAN DEBUG
+[5] run Archie
+[6] build target
+[7] build sanitizer
+...................
+Choose an option (number): 2
+Running.......cmake --build build -j$(nproc)\n\n
+[ 14%] Built target gtest
+[ 28%] Built target refactor_tool
+[ 42%] Built target gmock
+[ 57%] Built target gtest_main
+[ 71%] Built target gmock_main
+[100%] Built target refactor_tool_tests
+dev@042fc2a8edf9:/workspaces/mid-8-refactor-tool$ ./check_refactor.sh 
+mkdir: cannot create directory '/workspaces/mid-8-refactor-tool/tests/tests_data/tmp': File exists
+/workspaces/mid-8-refactor-tool/tests/tests_data/tmp/temp_test1.cpp:6:5: warning: Base class has childrenn, its dtor is non-virtual, adding 'virtual' 
+    6 |     ~BaseNoDtor() = default;
+      |     ^
+/workspaces/mid-8-refactor-tool/tests/tests_data/tmp/temp_test1.cpp:13:5: warning: Base class has childrenn, its dtor is non-virtual, adding 'virtual' 
+   13 |     ~BaseNonVirtual() {}  //Убедимся что один раз virtual
+      |     ^
+2 warnings generated.
+/workspaces/mid-8-refactor-tool/tests/tests_data/tmp/temp_test2.cpp:12:10: warning: Method w/o override, addigg 'override'
+   12 |     void func() {}  // Переопределен без override
+      |          ^
+/workspaces/mid-8-refactor-tool/tests/tests_data/tmp/temp_test2.cpp:13:10: warning: Method w/o override, addigg 'override'
+   13 |     void func(int a) {}  // Переопределен без override
+      |          ^
+/workspaces/mid-8-refactor-tool/tests/tests_data/tmp/temp_test2.cpp:19:10: warning: Method w/o override, addigg 'override'
+   19 |     void func() {}  // Переопределен без override
+      |          ^
+/workspaces/mid-8-refactor-tool/tests/tests_data/tmp/temp_test2.cpp:20:10: warning: Method w/o override, addigg 'override'
+   20 |     void func(int a) {}  // Переопределен без override
+      |          ^
+4 warnings generated.
+/workspaces/mid-8-refactor-tool/tests/tests_data/tmp/temp_test3.cpp:14:21: warning: range-for copies const object, adding '&'
+   14 |     for (const auto x : vec) {
+      |                     ^
+/workspaces/mid-8-refactor-tool/tests/tests_data/tmp/temp_test3.cpp:19:27: warning: range-for copies const object, adding '&'
+   19 |     for (const CustomType x : vec) {
+      |                           ^
+/workspaces/mid-8-refactor-tool/tests/tests_data/tmp/temp_test3.cpp:24:42: warning: range-for copies const object, adding '&'
+   24 |     for (const decltype(vec)::value_type x : vec) {
+      |                                          ^
+3 warnings generated.
+===== Результаты тестов =====
+Тест /workspaces/mid-8-refactor-tool/tests/tests_data/test1.cpp пройден!
+Тест /workspaces/mid-8-refactor-tool/tests/tests_data/test2.cpp пройден!
+Тест /workspaces/mid-8-refactor-tool/tests/tests_data/test3.cpp пройден!
+
+
+dev@042fc2a8edf9:/workspaces/mid-8-refactor-tool$ g++ -fsanitize=address -g tests/tests_data/leak_example.cpp -o leak_before
+dev@042fc2a8edf9:/workspaces/mid-8-refactor-tool$ ./leak_before 
+=================================================================
+==39244==ERROR: AddressSanitizer: new-delete-type-mismatch on 0x7b33d53e0010 in thread T0:
+  object passed to delete has wrong type:
+  size of the allocated type:   8 bytes;
+  size of the deallocated type: 1 bytes.
+    #0 0x7f13d68da3fb in operator delete(void*, unsigned long) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:155
+    #1 0x558269e2128c in main tests/tests_data/leak_example.cpp:18
+    #2 0x7f13d6210577  (/lib/x86_64-linux-gnu/libc.so.6+0x2a577) (BuildId: ae7440bbdce614e0e79280c3b2e45b1df44e639c)
+    #3 0x7f13d621063a in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x2a63a) (BuildId: ae7440bbdce614e0e79280c3b2e45b1df44e639c)
+    #4 0x558269e21164 in _start (/workspaces/mid-8-refactor-tool/leak_before+0x1164) (BuildId: 1f99c493b511659deeeddc03a904ce0aaea76d64)
+
+0x7b33d53e0010 is located 0 bytes inside of 8-byte region [0x7b33d53e0010,0x7b33d53e0018)
+allocated by thread T0 here:
+    #0 0x7f13d68d92db in operator new(unsigned long) ../../../../src/libsanitizer/asan/asan_new_delete.cpp:86
+    #1 0x558269e21243 in main tests/tests_data/leak_example.cpp:17
+    #2 0x7f13d6210577  (/lib/x86_64-linux-gnu/libc.so.6+0x2a577) (BuildId: ae7440bbdce614e0e79280c3b2e45b1df44e639c)
+    #3 0x7f13d621063a in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x2a63a) (BuildId: ae7440bbdce614e0e79280c3b2e45b1df44e639c)
+    #4 0x558269e21164 in _start (/workspaces/mid-8-refactor-tool/leak_before+0x1164) (BuildId: 1f99c493b511659deeeddc03a904ce0aaea76d64)
+
+SUMMARY: AddressSanitizer: new-delete-type-mismatch tests/tests_data/leak_example.cpp:18 in main
+==39244==HINT: if you don't care about these errors you may set ASAN_OPTIONS=new_delete_type_mismatch=0
+==39244==ABORTING
+dev@042fc2a8edf9:/workspaces/mid-8-refactor-tool$ g++ -fsanitize=address -g tests/tests_data/leak_example.cpp -o leak_after 
+dev@042fc2a8edf9:/workspaces/mid-8-refactor-tool$ ./leak_after  
+
+
+dev@042fc2a8edf9:/workspaces/mid-8-refactor-tool$ g++ -O2 -g tests/tests_data/perf_example.cpp -o perf_before
+dev@042fc2a8edf9:/workspaces/mid-8-refactor-tool$ ./perf_before 
+dev@042fc2a8edf9:/workspaces/mid-8-refactor-tool$ gprof ./perf_before gmon.out > report_before.txt
+head -n 20 report_before.txt
+Flat profile:
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total           
+ time   seconds   seconds    calls  ms/call  ms/call  name    
+ 68.89      0.31     0.31                             main
+ 31.11      0.45     0.14        1   140.00   140.00  std::vector<HeavyObject, std::allocator<HeavyObject> >::~vector()
+
+ %         the percentage of the total running time of the
+time       program used by this function.
+
+cumulative a running sum of the number of seconds accounted
+ seconds   for by this function and those listed above it.
+
+ self      the number of seconds accounted for by this
+seconds    function alone.  This is the major sort for this
+           listing.
+
+calls      the number of times this function was invoked, if
+           this function is profiled, else blank.
+
+
+
+dev@042fc2a8edf9:/workspaces/mid-8-refactor-tool$ g++ -O2 -pg -g tests/tests_data/perf_example.cpp -o perf_after
+dev@042fc2a8edf9:/workspaces/mid-8-refactor-tool$ ./perf_after  
+dev@042fc2a8edf9:/workspaces/mid-8-refactor-tool$ gprof ./perf_after gmon.out > report_after.txt
+dev@042fc2a8edf9:/workspaces/mid-8-refactor-tool$ head -20 report_after.txt 
+Flat profile:
+
+Each sample counts as 0.01 seconds.
+  %   cumulative   self              self     total           
+ time   seconds   seconds    calls  Ts/call  Ts/call  name    
+100.00      0.21     0.21                             main
+
+ %         the percentage of the total running time of the
+time       program used by this function.
+
+cumulative a running sum of the number of seconds accounted
+ seconds   for by this function and those listed above it.
+
+ self      the number of seconds accounted for by this
+seconds    function alone.  This is the major sort for this
+           listing.
+
+calls      the number of times this function was invoked, if
+           this function is profiled, else blank.
+
+dev@042fc2a8edf9:/workspaces/mid-8-refactor-tool$ 
